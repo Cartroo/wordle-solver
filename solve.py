@@ -13,9 +13,14 @@ class GuessState(Enum):
     MISPLACED = "?"
     CORRECT = "+"
 
+class SkipWordError(Exception):
+    pass
+
 def input_guess(expect_len=None):
     while True:
         text_input = input("Result [_x?+]: ").strip()
+        if not text_input:
+            raise SkipWordError()
         if expect_len is not None and len(text_input) != expect_len:
             print(f"Expected {expect_len} symbols")
         else:
@@ -45,7 +50,7 @@ def find_suggestions(words, num_suggestions):
                 counts[position][letter]
                 for position, letter in enumerate(word)),
             word))
-    return [i[1] for i in sorted(scores, reverse=True)[:num_suggestions]]
+    return sorted(scores, reverse=True)[:num_suggestions]
 
 def find_min_max_letter_repeats(words):
     min_repeats = {letter: 999 for letter in ascii_lowercase}
@@ -109,10 +114,17 @@ class WordleSolver:
 
     def run_until_solved(self):
         while len(self.words) > 1:
-            suggestions = find_suggestions(self.words, 5)
-            print(f"Suggestions: {', '.join(suggestions)}")
-            suggestion = input("Chosen word: ").strip()
-            feedback = input_guess(self.word_len)
+            suggestions = find_suggestions(self.words, 10)
+            feedback = None
+            for suggestion in (i[1] for i in suggestions):
+                print(f"Suggestion: {suggestion}")
+                try:
+                    feedback = input_guess(self.word_len)
+                    break
+                except SkipWordError:
+                    pass
+            if feedback is None:
+                raise Exception("No suggestions accepted")
             self.process_feedback(suggestion,
                                   feedback)
             self.filter_words()
@@ -125,7 +137,10 @@ class WordleSolver:
         return None
 
 def main():
+    print("Enter initial feedback with all '_' to set length")
     solver = WordleSolver(len(input_guess()))
+    print("Remaining feedback: x = wrong letter, ? = right letter, wrong place, + = right letter")
+    print("If the suggestion isn't accepted as a word, just hit enter to see next suggestion")
     solution = solver.run_until_solved()
     if solution is None:
         print("No solution found")
